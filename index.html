@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Image Batch Editor</title>
+  <style>
+    :root {
+      --bg: #101317;
+      --surface: #171f28;
+      --surface-strong: #1f2935;
+      --text: #f7f9fb;
+      --muted: #9aa5ba;
+      --accent: #4f9dff;
+      --accent-strong: #63b3ff;
+      --danger: #f87171;
+      --border: rgba(255, 255, 255, 0.08);
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body, #app {
+      min-height: 100vh;
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, #1c2c43 0%, #0a1118 55%);
+      color: var(--text);
+    }
+
+    button, input[type='range'] {
+      font: inherit;
+    }
+
+    button {
+      border: none;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      background: var(--accent);
+      color: #0b1220;
+      padding: 10px 14px;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .app-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .top-banner {
+      background: rgba(20, 28, 39, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 16px 24px;
+      margin-bottom: 20px;
+    }
+
+    .top-banner p {
+      margin: 0;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 280px minmax(420px, 1fr) 320px;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .panel h2 {
+      margin: 0 0 14px;
+      font-size: 1.08rem;
+    }
+
+    .upload-box {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .drop-zone {
+      border: 1px dashed rgba(255, 255, 255, 0.25);
+      border-radius: 1rem;
+      padding: 22px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.03);
+      transition: border-color 0.2s ease;
+    }
+
+    .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(79, 157, 255, 0.08);
+    }
+
+    .drop-zone strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .drop-zone button {
+      margin-top: 12px;
+    }
+
+    .thumbnail-list {
+      display: grid;
+      gap: 10px;
+      max-height: 600px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .thumbnail-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-radius: 0.9rem;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      transition: border 0.2s ease;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+
+    .thumbnail-item.selected {
+      border-color: var(--accent);
+    }
+
+    .thumbnail-item img {
+      width: 52px;
+      height: 52px;
+      object-fit: cover;
+      border-radius: 0.75rem;
+    }
+
+    .thumbnail-item .thumb-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .thumbnail-item .thumb-info strong {
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+    }
+
+    .thumbnail-item .thumb-info span {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .thumbnail-actions {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .preview-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .preview-area {
+      flex: 1;
+      position: relative;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      min-height: 420px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .preview-area canvas {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+    }
+
+    .preview-status {
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .toggle-group {
+      display: inline-flex;
+      gap: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px;
+    }
+
+    .toggle-group button {
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 12px;
+    }
+
+    .toggle-group button.active {
+      color: var(--text);
+      background: rgba(79, 157, 255, 0.16);
+    }
+
+    .adjust-control {
+      display: grid;
+      gap: 18px;
+    }
+
+    .adjust-row {
+      display: grid;
+      gap: 10px;
+      padding: 14px 14px 10px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .adjust-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.94rem;
+      color: #f7f9fb;
+    }
+
+    .adjust-input-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .adjust-input-row input[type='range'] {
+      width: 100%;
+      accent-color: transparent;
+      -webkit-appearance: none;
+      background: transparent;
+      height: 18px;
+      margin: 0;
+    }
+
+    .adjust-input-row input[type='range']::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+    }
+
+    .adjust-input-row input[type='range']::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #d4f0ff;
+      border: 2px solid #fff;
+      margin-top: -3px;
+      box-shadow: 0 2px 12px rgba(94, 181, 255, 0.35);
+      cursor: pointer;
+    }
+
+    .adjust-input-row input[type='range']::-moz-range-track {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+    }
+
+    .adjust-input-row input[type='range']::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #d4f0ff;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 12px rgba(94, 181, 255, 0.35);
+      cursor: pointer;
+    }
+
+    .adjust-input-row input[type='range']::-ms-track {
+      width: 100%;
+      height: 12px;
+      background: transparent;
+      border-color: transparent;
+      color: transparent;
+    }
+
+    .adjust-input-row input[type='range']::-ms-fill-lower,
+    .adjust-input-row input[type='range']::-ms-fill-upper {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+    }
+
+    .adjust-input-row input[type='range']::-ms-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #d4f0ff;
+      border: 2px solid #fff;
+      cursor: pointer;
+    }
+
+    .adjust-input-row input[type='range']::-moz-range-progress {
+      background: none;
+    }
+
+    .reset-single {
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      min-width: 72px;
+    }
+
+    .reset-single:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .action-buttons {
+      display: grid;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .action-buttons button {
+      padding: 14px 16px;
+      font-weight: 600;
+    }
+
+    .primary-button {
+      background: linear-gradient(135deg, #5eb5ff, #2f7bff);
+      color: #fff;
+    }
+
+    .secondary-button {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text);
+    }
+
+    .progress-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 12, 18, 0.82);
+      display: grid;
+      place-items: center;
+      z-index: 20;
+      padding: 24px;
+    }
+
+    .progress-card {
+      width: min(520px, 100%);
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 1.2rem;
+      padding: 24px;
+    }
+
+    .progress-card h3 {
+      margin: 0 0 14px;
+    }
+
+    .progress-bar {
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .progress-bar span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #50b4ff, #2f7bff);
+    }
+
+    .progress-meta {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .error-list {
+      margin-top: 14px;
+      padding: 14px;
+      background: rgba(248, 113, 113, 0.12);
+      border-radius: 0.95rem;
+      border: 1px solid rgba(248, 113, 113, 0.2);
+      color: #ffe4e6;
+    }
+
+    @media (max-width: 1200px) {
+      .grid-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <div class="top-banner">
+      <h1>로컬 이미지 일괄 보정 도구</h1>
+      <p>
+        이미지는 브라우저에서만 처리됩니다. 파일은 외부 서버로 업로드되지 않습니다.
+        최종 저장은 원본 해상도로 처리됩니다.
+      </p>
+    </div>
+
+    <div class="grid-layout">
+      <div class="panel">
+        <h2>업로드</h2>
+        <div class="upload-box">
+          <div id="drop-zone" class="drop-zone">
+            <strong>이미지 파일을 드래그하거나 파일 선택 버튼을 눌러주세요</strong>
+            <p>지원 형식: jpg, jpeg, png, webp</p>
+            <p>원본 해상도가 보존됩니다.</p>
+            <button id="file-select-btn" type="button">파일 선택</button>
+          </div>
+          <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        </div>
+        <div id="thumbnail-section" style="margin-top: 28px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+            <h2>업로드 이미지</h2>
+            <button id="clear-all-btn" type="button" class="secondary-button" disabled>전체 삭제</button>
+          </div>
+          <p id="file-count" style="color: #9aa5ba; margin: 10px 0 14px;">이미지 0장</p>
+          <div id="thumbnail-list" class="thumbnail-list"></div>
+        </div>
+      </div>
+
+      <div class="panel preview-shell">
+        <h2>미리보기</h2>
+        <div id="preview-area" class="preview-area">
+          <canvas id="before-canvas" style="display: none;"></canvas>
+          <canvas id="after-canvas" style="display: none;"></canvas>
+          <div style="color: #9aa5ba; text-align: center; padding: 24px;">
+            업로드된 이미지가 없습니다.
+          </div>
+        </div>
+        <div class="preview-status" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+          <div>
+            <strong id="preview-title">선택된 이미지 없음</strong>
+            <div id="preview-status-text" style="color: #9aa5ba; margin-top: 6px;">원본과 편집본 비교 중</div>
+          </div>
+          <button id="compare-btn" type="button" style="background: linear-gradient(135deg, #5eb5ff, #2f7bff); color: #fff; padding: 8px 12px; font-weight: 600;">누르고 있기: Before 비교</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>조정</h2>
+        <div class="adjust-control">
+          <div class="adjust-row">
+            <div class="adjust-header">
+              <span>밝기</span>
+              <span id="brightness-value" class="value">0</span>
+            </div>
+            <div class="adjust-input-row">
+              <input id="brightness-slider" type="range" min="-100" max="100" value="0">
+              <button id="brightness-reset" type="button" class="reset-single">리셋</button>
+            </div>
+          </div>
+          <div class="adjust-row">
+            <div class="adjust-header">
+              <span>채도</span>
+              <span id="saturation-value" class="value">0</span>
+            </div>
+            <div class="adjust-input-row">
+              <input id="saturation-slider" type="range" min="-100" max="100" value="0">
+              <button id="saturation-reset" type="button" class="reset-single">리셋</button>
+            </div>
+          </div>
+          <div class="adjust-row">
+            <div class="adjust-header">
+              <span>선명도</span>
+              <span id="sharpness-value" class="value">0</span>
+            </div>
+            <div class="adjust-input-row">
+              <input id="sharpness-slider" type="range" min="0" max="100" value="0">
+              <button id="sharpness-reset" type="button" class="reset-single">리셋</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button id="apply-all-btn" type="button" class="primary-button" disabled>전체 적용 및 다운로드</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="progress-overlay" class="progress-overlay" style="display: none;">
+      <div class="progress-card">
+        <h3>일괄 처리 중입니다</h3>
+        <div class="progress-bar">
+          <span id="progress-fill"></span>
+        </div>
+        <div id="progress-meta" class="progress-meta">0 / 0 처리 중</div>
+        <div id="error-list" class="error-list" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/file-saver/2.0.5/FileSaver.min.js"></script>
+  <script>
+    // State
+    let files = [];
+    let selectedIndex = -1;
+    let adjustments = { brightness: 0, saturation: 0, sharpness: 0 };
+    let previewMode = 'after';
+    let processedBlobs = [];
+    let failedFiles = [];
+    let zipBlob = null;
+
+    // DOM elements
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileSelectBtn = document.getElementById('file-select-btn');
+    const thumbnailList = document.getElementById('thumbnail-list');
+    const fileCount = document.getElementById('file-count');
+    const clearAllBtn = document.getElementById('clear-all-btn');
+    const previewArea = document.getElementById('preview-area');
+    const beforeCanvas = document.getElementById('before-canvas');
+    const afterCanvas = document.getElementById('after-canvas');
+    const previewTitle = document.getElementById('preview-title');
+    const previewStatusText = document.getElementById('preview-status-text');
+    const compareBtn = document.getElementById('compare-btn');
+    const brightnessSlider = document.getElementById('brightness-slider');
+    const brightnessValue = document.getElementById('brightness-value');
+    const saturationSlider = document.getElementById('saturation-slider');
+    const saturationValue = document.getElementById('saturation-value');
+    const sharpnessSlider = document.getElementById('sharpness-slider');
+    const sharpnessValue = document.getElementById('sharpness-value');
+    const brightnessReset = document.getElementById('brightness-reset');
+    const saturationReset = document.getElementById('saturation-reset');
+    const sharpnessReset = document.getElementById('sharpness-reset');
+    const applyAllBtn = document.getElementById('apply-all-btn');
+    const progressOverlay = document.getElementById('progress-overlay');
+    const progressFill = document.getElementById('progress-fill');
+    const progressMeta = document.getElementById('progress-meta');
+    const errorList = document.getElementById('error-list');
+
+    // Utility functions
+    function isSupportedImageFile(file) {
+      return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
+             /\.(jpe?g|png|webp)$/i.test(file.name);
+    }
+
+    function normalizeFilename(name) {
+      return name.replace(/[^a-zA-Z0-9._\-가-힣]/g, '_');
+    }
+
+    async function loadImageMetadata(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          URL.revokeObjectURL(img.src);
+        };
+        img.onerror = () => {
+          reject(new Error('이미지 로드 실패'));
+          URL.revokeObjectURL(img.src);
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    function createThumbnail(file) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const size = 52;
+          canvas.width = size;
+          canvas.height = size;
+          ctx.drawImage(img, 0, 0, size, size);
+          const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+          URL.revokeObjectURL(img.src);
+          resolve(thumbnailUrl);
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    // Image processing functions
+    function clamp(value, min = 0, max = 255) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function rgbToHsl(r, g, b) {
+      const rn = r / 255;
+      const gn = g / 255;
+      const bn = b / 255;
+      const max = Math.max(rn, gn, bn);
+      const min = Math.min(rn, gn, bn);
+      const delta = max - min;
+      let h = 0;
+      let s = 0;
+      const l = (max + min) / 2;
+
+      if (delta !== 0) {
+        s = delta / (1 - Math.abs(2 * l - 1));
+        switch (max) {
+          case rn:
+            h = ((gn - bn) / delta) % 6;
+            break;
+          case gn:
+            h = (bn - rn) / delta + 2;
+            break;
+          case bn:
+            h = (rn - gn) / delta + 4;
+            break;
+        }
+        h *= 60;
+        if (h < 0) h += 360;
+      }
+
+      return { h, s, l };
+    }
+
+    function hslToRgb(h, s, l) {
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+      const m = l - c / 2;
+      let r1 = 0;
+      let g1 = 0;
+      let b1 = 0;
+
+      if (h >= 0 && h < 60) {
+        r1 = c;
+        g1 = x;
+      } else if (h >= 60 && h < 120) {
+        r1 = x;
+        g1 = c;
+      } else if (h >= 120 && h < 180) {
+        g1 = c;
+        b1 = x;
+      } else if (h >= 180 && h < 240) {
+        g1 = x;
+        b1 = c;
+      } else if (h >= 240 && h < 300) {
+        r1 = x;
+        b1 = c;
+      } else {
+        r1 = c;
+        b1 = x;
+      }
+
+      return {
+        r: clamp(Math.round((r1 + m) * 255)),
+        g: clamp(Math.round((g1 + m) * 255)),
+        b: clamp(Math.round((b1 + m) * 255)),
+      };
+    }
+
+    function applyColorAdjustments(data, adjustments) {
+      // 밝기: -100~100을 -100%~100% 범위로 변환 (슬라이더 값 그대로 효과 적용)
+      const brightnessFactor = 1 + (adjustments.brightness / 200);
+      
+      // 채도: -100~100을 -0.8~0.8 범위로 변환
+      const saturationAmount = adjustments.saturation * 0.008;
+
+      for (let i = 0; i < data.data.length; i += 4) {
+        let r = data.data[i];
+        let g = data.data[i + 1];
+        let b = data.data[i + 2];
+        const a = data.data[i + 3];
+
+        // 밝기: 곱하기 방식
+        r = clamp(r * brightnessFactor);
+        g = clamp(g * brightnessFactor);
+        b = clamp(b * brightnessFactor);
+
+        if (saturationAmount !== 0) {
+          const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
+          r = clamp(gray + (r - gray) * (1 + saturationAmount));
+          g = clamp(gray + (g - gray) * (1 + saturationAmount));
+          b = clamp(gray + (b - gray) * (1 + saturationAmount));
+        }
+
+        data.data[i] = r;
+        data.data[i + 1] = g;
+        data.data[i + 2] = b;
+        data.data[i + 3] = a;
+      }
+    }
+
+    function applySharpen(data, sharpness) {
+      if (sharpness <= 0) {
+        return;
+      }
+
+      const width = data.width;
+      const height = data.height;
+      const copy = new Uint8ClampedArray(data.data);
+      
+      // 선명도: 최대 0.8 효과로 더 뚜렷하게
+      const amount = (sharpness / 100) * 0.8;
+      const index = (x, y, c) => (y * width + x) * 4 + c;
+
+      for (let y = 1; y < height - 1; y += 1) {
+        for (let x = 1; x < width - 1; x += 1) {
+          for (let channel = 0; channel < 3; channel += 1) {
+            const center = copy[index(x, y, channel)];
+            const left = copy[index(x - 1, y, channel)];
+            const right = copy[index(x + 1, y, channel)];
+            const top = copy[index(x, y - 1, channel)];
+            const bottom = copy[index(x, y + 1, channel)];
+
+            // 엣지 강도 계산
+            const edgeStrength = Math.abs(center - left) + Math.abs(center - right) +
+                                Math.abs(center - top) + Math.abs(center - bottom);
+
+            if (edgeStrength > 6) {
+              const sharpened = center + (center - (left + right + top + bottom) / 4) * amount;
+              data.data[index(x, y, channel)] = clamp(Math.round(sharpened));
+            }
+          }
+        }
+      }
+    }
+
+    async function renderPreviewToCanvas(canvas, imageUrl, adjustments, mode) {
+      const img = new Image();
+      img.src = imageUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('미리보기 로드 실패'));
+      });
+
+      // 미리보기도 원본 해상도로 렌더링 (CSS로 스케일링)
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      if (mode === 'after' && (adjustments.brightness || adjustments.saturation || adjustments.sharpness)) {
+        const imageData = ctx.getImageData(0, 0, width, height);
+        applyColorAdjustments(imageData, adjustments);
+        if (adjustments.sharpness > 0) {
+          applySharpen(imageData, adjustments.sharpness);
+        }
+        ctx.putImageData(imageData, 0, 0);
+      }
+    }
+
+    async function processImageFile(file, adjustments) {
+      const bitmap = await createImageBitmap(file);
+      const width = bitmap.width;
+      const height = bitmap.height;
+      let canvas;
+      let ctx;
+
+      if (typeof OffscreenCanvas !== 'undefined') {
+        canvas = new OffscreenCanvas(width, height);
+        ctx = canvas.getContext('2d');
+      } else {
+        canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        ctx = canvas.getContext('2d');
+      }
+
+      if (!ctx) {
+        throw new Error('Canvas context unavailable');
+      }
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(bitmap, 0, 0, width, height);
+
+      if (adjustments.brightness || adjustments.saturation || adjustments.sharpness) {
+        const imageData = ctx.getImageData(0, 0, width, height);
+        applyColorAdjustments(imageData, adjustments);
+        if (adjustments.sharpness > 0) {
+          applySharpen(imageData, adjustments.sharpness);
+        }
+        ctx.putImageData(imageData, 0, 0);
+      }
+
+      const type = file.type || 'image/png';
+      const quality = type === 'image/jpeg' ? 0.95 : undefined;
+      if (canvas.convertToBlob) {
+        return await canvas.convertToBlob({ type, quality });
+      }
+
+      return await new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Blob 생성 실패'));
+        }, type, quality);
+      });
+    }
+
+    // UI update functions
+    function updateFileCount() {
+      fileCount.textContent = `이미지 ${files.length}장`;
+      clearAllBtn.disabled = files.length === 0;
+      applyAllBtn.disabled = files.length === 0;
+    }
+
+    function updateThumbnails() {
+      thumbnailList.innerHTML = '';
+      files.forEach((file, index) => {
+        const item = document.createElement('div');
+        item.className = `thumbnail-item${selectedIndex === index ? ' selected' : ''}`;
+        item.onclick = () => selectImage(index);
+        item.innerHTML = `
+          <img src="${file.thumbnailUrl}" alt="${file.name}">
+          <div class="thumb-info">
+            <strong>${file.name}</strong>
+            <span>${file.width}×${file.height}</span>
+          </div>
+        `;
+        thumbnailList.appendChild(item);
+      });
+    }
+
+    function selectImage(index) {
+      selectedIndex = index;
+      updateThumbnails();
+      updatePreview();
+    }
+
+    function updatePreview() {
+      const file = files[selectedIndex];
+      if (!file) {
+        beforeCanvas.style.display = 'none';
+        afterCanvas.style.display = 'none';
+        previewArea.querySelector('div').style.display = 'block';
+        previewTitle.textContent = '선택된 이미지 없음';
+        return;
+      }
+
+      previewArea.querySelector('div').style.display = 'none';
+      previewTitle.textContent = file.name;
+
+      // Render before (original)
+      renderPreviewToCanvas(beforeCanvas, file.previewUrl, adjustments, 'before').catch(() => {
+        // Handle error if needed
+      });
+
+      // Render after (adjusted)
+      renderPreviewToCanvas(afterCanvas, file.previewUrl, adjustments, 'after').catch(() => {
+        // Handle error if needed
+      });
+
+      // Show current mode
+      updatePreviewDisplay();
+    }
+
+    function updatePreviewDisplay() {
+      if (previewMode === 'before') {
+        beforeCanvas.style.display = 'block';
+        afterCanvas.style.display = 'none';
+        previewStatusText.textContent = '원본 보기 중';
+      } else {
+        beforeCanvas.style.display = 'none';
+        afterCanvas.style.display = 'block';
+        previewStatusText.textContent = '편집본 보기 중';
+      }
+    }
+
+    function updateAdjustmentValues() {
+      brightnessValue.textContent = adjustments.brightness;
+      saturationValue.textContent = adjustments.saturation;
+      sharpnessValue.textContent = adjustments.sharpness;
+      updateSliderVisuals();
+    }
+
+    function updateSliderVisuals() {
+      setRangeBackground(brightnessSlider, adjustments.brightness, true);
+      setRangeBackground(saturationSlider, adjustments.saturation, true);
+      setRangeBackground(sharpnessSlider, adjustments.sharpness, false);
+    }
+
+    function setRangeBackground(slider, value, centered) {
+      const zero = 50;
+      if (centered) {
+        const percent = Math.min(Math.max((value + 100) / 2, 0), 100);
+        if (value > 0) {
+          slider.style.background = `linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.08) ${zero}%, #5eb5ff ${zero}%, #5eb5ff ${percent}%, rgba(255,255,255,0.08) ${percent}%, rgba(255,255,255,0.08) 100%)`;
+        } else if (value < 0) {
+          slider.style.background = `linear-gradient(90deg, rgba(255,255,255,0.08) 0%, #5eb5ff ${percent}%, #5eb5ff ${zero}%, rgba(255,255,255,0.08) ${zero}%, rgba(255,255,255,0.08) 100%)`;
+        } else {
+          slider.style.background = 'linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.08) 100%)';
+        }
+      } else {
+        const percent = Math.min(Math.max(value, 0), 100);
+        slider.style.background = `linear-gradient(90deg, #5eb5ff 0%, #5eb5ff ${percent}%, rgba(255,255,255,0.08) ${percent}%, rgba(255,255,255,0.08) 100%)`;
+      }
+      slider.style.backgroundRepeat = 'no-repeat';
+    }
+
+    // Event handlers
+    fileSelectBtn.onclick = () => fileInput.click();
+
+    fileInput.onchange = (event) => {
+      const fileList = event.target.files;
+      if (fileList) {
+        handleFiles(fileList);
+      }
+    };
+
+    dropZone.ondragover = (event) => {
+      event.preventDefault();
+      dropZone.classList.add('drag-over');
+    };
+
+    dropZone.ondragleave = () => {
+      dropZone.classList.remove('drag-over');
+    };
+
+    dropZone.ondrop = (event) => {
+      event.preventDefault();
+      dropZone.classList.remove('drag-over');
+      handleFiles(event.dataTransfer.files);
+    };
+
+    async function handleFiles(fileList) {
+      const validFiles = [];
+      const invalidNames = [];
+
+      for (const file of fileList) {
+        if (!isSupportedImageFile(file)) {
+          invalidNames.push(file.name);
+          continue;
+        }
+        try {
+          const metadata = await loadImageMetadata(file);
+          const thumbnailUrl = await createThumbnail(file);
+          const previewUrl = URL.createObjectURL(file);
+          validFiles.push({
+            file,
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            thumbnailUrl,
+            previewUrl,
+            width: metadata.width,
+            height: metadata.height,
+          });
+        } catch (error) {
+          invalidNames.push(file.name);
+        }
+      }
+
+      if (invalidNames.length) {
+        alert(`지원하지 않는 파일 또는 로드 실패: ${invalidNames.join(', ')}`);
+      }
+
+      if (validFiles.length > 0) {
+        files.push(...validFiles);
+        if (selectedIndex === -1) {
+          selectedIndex = 0;
+        }
+        updateFileCount();
+        updateThumbnails();
+        updatePreview();
+      }
+    }
+
+    clearAllBtn.onclick = () => {
+      files.forEach((file) => {
+        URL.revokeObjectURL(file.previewUrl);
+      });
+      files = [];
+      selectedIndex = -1;
+      processedBlobs = [];
+      failedFiles = [];
+      zipBlob = null;
+      updateFileCount();
+      updateThumbnails();
+      updatePreview();
+      downloadBtn.disabled = true;
+    };
+
+    brightnessSlider.oninput = (event) => {
+      adjustments.brightness = Number(event.target.value);
+      updateAdjustmentValues();
+      // Update after canvas only
+      if (files[selectedIndex]) {
+        renderPreviewToCanvas(afterCanvas, files[selectedIndex].previewUrl, adjustments, 'after').catch(() => {});
+      }
+    };
+
+    saturationSlider.oninput = (event) => {
+      adjustments.saturation = Number(event.target.value);
+      updateAdjustmentValues();
+      // Update after canvas only
+      if (files[selectedIndex]) {
+        renderPreviewToCanvas(afterCanvas, files[selectedIndex].previewUrl, adjustments, 'after').catch(() => {});
+      }
+    };
+
+    sharpnessSlider.oninput = (event) => {
+      adjustments.sharpness = Number(event.target.value);
+      updateAdjustmentValues();
+      // Update after canvas only
+      if (files[selectedIndex]) {
+        renderPreviewToCanvas(afterCanvas, files[selectedIndex].previewUrl, adjustments, 'after').catch(() => {});
+      }
+    };
+
+    // 초기 슬라이더 시각 효과
+    updateSliderVisuals();
+
+    brightnessReset.onclick = () => {
+      adjustments.brightness = 0;
+      brightnessSlider.value = '0';
+      updateAdjustmentValues();
+      if (files[selectedIndex]) {
+        updatePreview();
+      }
+    };
+
+    saturationReset.onclick = () => {
+      adjustments.saturation = 0;
+      saturationSlider.value = '0';
+      updateAdjustmentValues();
+      if (files[selectedIndex]) {
+        updatePreview();
+      }
+    };
+
+    sharpnessReset.onclick = () => {
+      adjustments.sharpness = 0;
+      sharpnessSlider.value = '0';
+      updateAdjustmentValues();
+      if (files[selectedIndex]) {
+        updatePreview();
+      }
+    };
+
+    // Before/After 비교 버튼: 누르고 있을 때만 Before 유지
+    compareBtn.addEventListener('mousedown', () => {
+      previewMode = 'before';
+      updatePreviewDisplay();
+    });
+
+    compareBtn.addEventListener('mouseup', () => {
+      previewMode = 'after';
+      updatePreviewDisplay();
+    });
+
+    compareBtn.addEventListener('mouseleave', () => {
+      previewMode = 'after';
+      updatePreviewDisplay();
+    });
+
+    // 터치 지원 (모바일)
+    compareBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      previewMode = 'before';
+      updatePreviewDisplay();
+    });
+
+    compareBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      previewMode = 'after';
+      updatePreviewDisplay();
+    });
+
+    applyAllBtn.onclick = async () => {
+      if (!files.length) return;
+
+      progressOverlay.style.display = 'grid';
+      progressFill.style.width = '0%';
+      progressMeta.textContent = `0 / ${files.length} 처리 중`;
+      errorList.style.display = 'none';
+      processedBlobs = [];
+      failedFiles = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        progressMeta.textContent = `${i + 1} / ${files.length} 처리 중 - ${file.name}`;
+        progressFill.style.width = `${((i + 1) / files.length) * 100}%`;
+
+        try {
+          const blob = await processImageFile(file.file, adjustments);
+          processedBlobs.push({
+            name: normalizeFilename(`edited_${file.name}`),
+            blob,
+          });
+        } catch (error) {
+          failedFiles.push(file.name);
+        }
+
+        // Allow UI to update
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+
+      if (failedFiles.length) {
+        errorList.textContent = `실패: ${failedFiles.join(', ')}`;
+        errorList.style.display = 'block';
+      }
+
+      progressMeta.textContent = 'ZIP 생성 중...';
+
+      try {
+        const zip = new JSZip();
+        processedBlobs.forEach((item) => {
+          zip.file(item.name, item.blob);
+        });
+        zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        
+        // 바로 다운로드
+        if (typeof saveAs === 'function') {
+          saveAs(zipBlob, 'edited-images.zip');
+        } else {
+          const a = document.createElement('a');
+          const url = URL.createObjectURL(zipBlob);
+          a.href = url;
+          a.download = 'edited-images.zip';
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+      } catch (error) {
+        alert('ZIP 생성 중 오류가 발생했습니다.');
+      }
+
+      progressOverlay.style.display = 'none';
+    };
+
+    // Initialize
+    updateFileCount();
+    updateAdjustmentValues();
+  </script>
+</body>
+</html>
